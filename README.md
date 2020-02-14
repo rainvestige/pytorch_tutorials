@@ -1,2 +1,2 @@
 # pytorch_tutorials
-Official pytorch tutorials
+Learning official pytorch tutorials

@@ -4,4 +4,5 @@ numpy
 torch
 torchvision
 matplotlib
+ipython
 

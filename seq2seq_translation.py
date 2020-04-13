@@ -20,7 +20,6 @@
 """
 
 
-from __future__ import unicode_literals, print_function, division
 import unicodedata
 import string
 import re
@@ -83,9 +82,9 @@ class Lang:
 
         if word not in self.word2index:
             self.word2index[word] = self.n_words
-            self.n_words += 1
             self.word2count[word] = 1
             self.index2word[self.n_words] = word
+            self.n_words += 1
         else:
             self.word2count[word] += 1
 
@@ -320,7 +319,8 @@ class AttnDecoderRNN(nn.Module):
         embedded = self.dropout(embedded)
 
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded[0], hidden[0]), 1)), dim=1)
+            self.attn(torch.cat((embedded[0], hidden[0]), 1)), 
+            dim=1)
         attn_applied = torch.bmm(attn_weights.unsqueeze(0), 
                                  encoder_outputs.unsqueeze(0))
 
@@ -401,7 +401,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer,
             input_tensor[ei], encoder_hidden)
         encoder_outputs[ei] = encoder_output[0, 0]
 
-    decoder_input = torch.tensor([[EOS_TOKEN]], device=DEVICE)
+    decoder_input = torch.tensor([[SOS_TOKEN]], device=DEVICE)
     decoder_hidden = encoder_hidden
 
     use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
@@ -420,9 +420,9 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer,
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
             topv, topi = decoder_output.topk(1)
-            loss += criterion(decoder_output, target_tensor[di])
             decoder_input = topi.squeeze().detach()   # Detach from history as input
 
+            loss += criterion(decoder_output, target_tensor[di])
             if decoder_input.item() == EOS_TOKEN:
                 break
 
@@ -523,7 +523,7 @@ def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
         input_length = input_tensor.size()[0]
         encoder_hidden = encoder.init_hidden()
 
-        encoder_outputs = torch.zeros(max_length, encoder.hiddden_size,
+        encoder_outputs = torch.zeros(max_length, encoder.hidden_size,
                                       device=DEVICE)
 
         for ei in range(input_length):
@@ -531,21 +531,21 @@ def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
                                                      encoder_hidden)
             encoder_outputs[ei] += encoder_output[0, 0]
 
-        decoder_input = torch.tensor([[EOS_TOKEN]], devce=DEVICE)  # SOS
+        decoder_input = torch.tensor([[SOS_TOKEN]], device=DEVICE)  # SOS
         decoder_hidden = encoder_hidden
 
         decoded_words = []
-        decoder_attention = torch.zeros(max_length, max_length)
+        decoder_attentions = torch.zeros(max_length, max_length)
 
         for di in range(max_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
-            decoder_attention[di] = decoder_attention.data
+            decoder_attentions[di] = decoder_attention.data
             topv, topi = decoder_output.data.topk(1)
             if topi.item() == EOS_TOKEN:
                 decoded_words.append('<EOS>')
                 break
-            else:
+            elif topi.item() in output_lang.index2word.keys():
                 decoded_words.append(output_lang.index2word[topi.item()])
 
             decoder_input = topi.squeeze().detach()
@@ -596,7 +596,7 @@ evaluate_randomly(encoder1, attn_decoder1)
 # output steps:
 
 output_words, attentions = evaluate(encoder1, attn_decoder1, 'je suis trop froid .')
-plt.matshow(attentions.numpy())
+plt.matshow(attentions.cpu().numpy())
 
 
 # For a better viewing experience we will do the extra work of adding axes and 
@@ -606,7 +606,7 @@ def show_attention(input_sentence, output_words, attentions):
     # set up figure with colorbar
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    cax = ax.matshow(attentions.numpy(), cmap='bone')
+    cax = ax.matshow(attentions.cpu().numpy(), cmap='bone')
     fig.colorbar(cax)
 
     # set up axes
